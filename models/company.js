@@ -49,15 +49,59 @@ class Company {
    * Returns [{ handle, name, description, numEmployees, logoUrl }, ...]
    * */
 
-  static async findAll() {
-    const companiesRes = await db.query(
-          `SELECT handle,
-                  name,
-                  description,
-                  num_employees AS "numEmployees",
-                  logo_url AS "logoUrl"
-           FROM companies
-           ORDER BY name`);
+  // static async findAll() {
+  //   const companiesRes = await db.query(
+  //         `SELECT handle,
+  //                 name,
+  //                 description,
+  //                 num_employees AS "numEmployees",
+  //                 logo_url AS "logoUrl"
+  //          FROM companies
+  //          ORDER BY name`);
+  //   return companiesRes.rows;
+  // }
+
+  static async findAll(searchFilters = {}) {
+    let q = `SELECT handle,
+                        name,
+                        description,
+                        num_employees AS "numEmployees",
+                        logo_url AS "logoUrl"
+                 FROM companies`;
+    let whereExpressions = [];
+    let qValues = [];
+
+    const { minEmployees, maxEmployees, name } = searchFilters;
+
+    if (minEmployees > maxEmployees) {
+      throw new BadRequestError("Min employees cannot be greater than max employees");
+    }
+
+    // each if statement below updates the where statement of the query if something is referenced
+
+    if (minEmployees !== undefined) {
+      qValues.push(minEmployees);
+      whereExpressions.push(`num_employees >= $${qValues.length}`);
+    }
+
+    if (maxEmployees !== undefined) {
+      qValues.push(maxEmployees);
+      whereExpressions.push(`num_employees <= $${qValues.length}`);
+    }
+
+    if (name) {
+      qValues.push(`%${name}%`);
+      whereExpressions.push(`name ILIKE $${qValues.length}`);
+    }
+
+    if (whereExpressions.length > 0) {
+      q += " WHERE " + whereExpressions.join(" AND ");
+    }
+
+    // finishing the query and displaying the results
+
+    q += " ORDER BY name";
+    const companiesRes = await db.query(q, qValues);
     return companiesRes.rows;
   }
 
